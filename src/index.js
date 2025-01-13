@@ -31,7 +31,7 @@ app.post("/sign-up", async (req, res) => {
 
   // Insert user in the database
   try {
-    const usernameExists = await db.collection('users').findOne({ username: user.username});
+    const usernameExists = await db.collection('users').findOne({ username: user.username });
     if (usernameExists) {
       return res.status(httpStatus.CONFLICT).send('Username already exists');
     }
@@ -44,6 +44,7 @@ app.post("/sign-up", async (req, res) => {
 
 app.post("/tweets", async (req, res) => {
   const tweet = req.body;
+  // tweet.createdAt = new Date();
   // Joi schema validation
   const validationResult = validadeBody(tweet);
   if (!validationResult.isValid) {
@@ -63,7 +64,19 @@ app.post("/tweets", async (req, res) => {
   }
 })
 
-
+app.get("/tweets", async (req, res) => {
+  try {
+    const tweets = await db.collection('tweets').find().sort({ _id: -1 }).toArray();
+    if (tweets.length === 0) return res.status(httpStatus.OK).send([]);
+    const avatarTweets = await Promise.all(tweets.map(async (tweet) => {
+      const avatar = await db.collection('users').findOne({ username: tweet.username});
+      return { ...tweet, avatar: avatar.avatar };
+    }));
+    res.status(httpStatus.OK).send(avatarTweets);
+  } catch (error) {
+    res.status(httpStatus.INTERNAL_SERVER_ERROR).send(error.message);
+  }
+})
 
 // Dynamic Joi schema validation
 function validadeBody(body) {
