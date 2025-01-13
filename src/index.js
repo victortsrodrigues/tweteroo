@@ -69,7 +69,7 @@ app.get("/tweets", async (req, res) => {
     const tweets = await db.collection('tweets').find().sort({ _id: -1 }).toArray();
     if (tweets.length === 0) return res.status(httpStatus.OK).send([]);
     const avatarTweets = await Promise.all(tweets.map(async (tweet) => {
-      const avatar = await db.collection('users').findOne({ username: tweet.username});
+      const avatar = await db.collection('users').findOne({ username: tweet.username });
       return { ...tweet, avatar: avatar.avatar };
     }));
     res.status(httpStatus.OK).send(avatarTweets);
@@ -86,7 +86,6 @@ app.put("/tweets/:id", async (req, res) => {
   if (!validationResult.isValid) {
     return res.status(httpStatus.UNPROCESSABLE_ENTITY).send(validationResult.messages);
   }
-
   // Update tweet in the database
   try {
     // Check if tweet exists
@@ -100,7 +99,20 @@ app.put("/tweets/:id", async (req, res) => {
     }
     // Update tweet
     await db.collection('tweets').updateOne({ _id: new ObjectId(id) }, { $set: { tweet: tweet.tweet } });
-    res.status(httpStatus.OK).send('Tweet updated');
+    res.status(httpStatus.NO_CONTENT).send('Tweet updated');
+  } catch (error) {
+    return res.status(httpStatus.INTERNAL_SERVER_ERROR).send(error.message);
+  }
+})
+
+app.delete("/tweets/:id", async (req, res) => {
+  const {id} = req.params;
+  try {
+    const deleted = await db.collection('tweets').deleteOne({ _id: new ObjectId(id) });
+    if (deleted.deletedCount === 0) {
+      return res.status(httpStatus.NOT_FOUND).send('Tweet not found');
+    }
+    return res.status(httpStatus.NO_CONTENT).send('Tweet deleted');
   } catch (error) {
     return res.status(httpStatus.INTERNAL_SERVER_ERROR).send(error.message);
   }
@@ -108,14 +120,16 @@ app.put("/tweets/:id", async (req, res) => {
 
 // Dynamic Joi schema validation
 function validadeBody(body) {
-  const dynamicSchema = joi.object().pattern(joi.string(), joi.string().required());
-  const validation = dynamicSchema.validate(body, { abortEarly: false });
-  if (validation.error) {
-    const messages = validation.error.details.map((detail) => detail.message);
-    return { isValid: false, messages };
+    const dynamicSchema = joi.object().pattern(joi.string(), joi.string().required());
+    const validation = dynamicSchema.validate(body, { abortEarly: false });
+    if (validation.error) {
+      const messages = validation.error.details.map((detail) => detail.message);
+      return { isValid: false, messages };
+    }
+    return { isValid: true };
   }
-  return { isValid: true };
-}
+
+
 
 // Port to run the server
 const port = process.env.PORT || 5000;
