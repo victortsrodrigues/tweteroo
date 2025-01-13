@@ -78,6 +78,34 @@ app.get("/tweets", async (req, res) => {
   }
 })
 
+app.put("/tweets/:id", async (req, res) => {
+  const { id } = req.params;
+  const tweet = req.body;
+  // Joi schema validation
+  const validationResult = validadeBody(tweet);
+  if (!validationResult.isValid) {
+    return res.status(httpStatus.UNPROCESSABLE_ENTITY).send(validationResult.messages);
+  }
+
+  // Update tweet in the database
+  try {
+    // Check if tweet exists
+    const tweetExists = await db.collection('tweets').findOne({ _id: new ObjectId(id) });
+    if (!tweetExists) {
+      return res.status(httpStatus.NOT_FOUND).send('Tweet not found');
+    }
+    // Check if user is the owner of the tweet
+    if (tweetExists.username !== tweet.username) {
+      return res.status(httpStatus.UNAUTHORIZED).send('You can only update your own tweets');
+    }
+    // Update tweet
+    await db.collection('tweets').updateOne({ _id: new ObjectId(id) }, { $set: { tweet: tweet.tweet } });
+    res.status(httpStatus.OK).send('Tweet updated');
+  } catch (error) {
+    return res.status(httpStatus.INTERNAL_SERVER_ERROR).send(error.message);
+  }
+})
+
 // Dynamic Joi schema validation
 function validadeBody(body) {
   const dynamicSchema = joi.object().pattern(joi.string(), joi.string().required());
