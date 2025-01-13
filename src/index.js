@@ -24,14 +24,9 @@ let db = mongoClient.db();
 app.post("/sign-up", async (req, res) => {
   const user = req.body;
   // Joi schema validation
-  const schema = joi.object({
-    username: joi.string().required(),
-    avatar: joi.string().required()
-  })
-  const validation = schema.validate(user, { abortEarly: false });
-  if (validation.error) {
-    const mensagens = validation.error.details.map((detail) => detail.message);
-    return res.status(httpStatus.UNPROCESSABLE_ENTITY).send(mensagens);
+  const validationResult = validadeBody(user);
+  if (!validationResult.isValid) {
+    return res.status(httpStatus.UNPROCESSABLE_ENTITY).send(validationResult.messages);
   }
 
   // Insert user in the database
@@ -46,6 +41,40 @@ app.post("/sign-up", async (req, res) => {
     res.status(httpStatus.INTERNAL_SERVER_ERROR).send(error.message);
   }
 })
+
+app.post("/tweets", async (req, res) => {
+  const tweet = req.body;
+  // Joi schema validation
+  const validationResult = validadeBody(tweet);
+  if (!validationResult.isValid) {
+    return res.status(httpStatus.UNPROCESSABLE_ENTITY).send(validationResult.messages);
+  }
+
+  // Insert tweet in the database
+  try {
+    const usernameExists = await db.collection('users').findOne({ username: tweet.username });
+    if (!usernameExists) {
+      return res.status(httpStatus.UNAUTHORIZED).send('User not found');
+    }
+    await db.collection('tweets').insertOne(tweet);
+    res.status(httpStatus.CREATED).send('Tweet created');
+  } catch (error) {
+    res.status(httpStatus.INTERNAL_SERVER_ERROR).send(error.message);
+  }
+})
+
+
+
+// Dynamic Joi schema validation
+function validadeBody(body) {
+  const dynamicSchema = joi.object().pattern(joi.string(), joi.string().required());
+  const validation = dynamicSchema.validate(body, { abortEarly: false });
+  if (validation.error) {
+    const messages = validation.error.details.map((detail) => detail.message);
+    return { isValid: false, messages };
+  }
+  return { isValid: true };
+}
 
 // Port to run the server
 const port = process.env.PORT || 5000;
